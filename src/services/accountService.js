@@ -48,14 +48,22 @@ class AccountService {
     async getAccountByField(fieldData) {
         const query = { where: { ...fieldData } };
         return await this.#accountRepository.fetchOne(query);
-    }   
+    }
 
-    async creditAccount(accountNumber, amount){
-        const query = { where: { accountNumber } }
+    async creditAccount(accountNumber, amount, dbOptions) {
+        const query = { where: { accountNumber }, ...dbOptions };
         const data = {
-            balance: sequelize.literal(`balance+${amount}`)
-        }
-        return await this.#accountRepository.updateOne(data, query)
+            balance: sequelize.literal(`balance+${amount}`),
+        };
+        return await this.#accountRepository.updateOne(data, query);
+    }
+
+    async debitAccount(accountNumber, amount, dbOptions) {
+        const query = { where: { accountNumber }, ...dbOptions };
+        const data = {
+            balance: sequelize.literal(`balance-${amount}`),
+        };
+        return await this.#accountRepository.updateOne(data, query);
     }
 }
 

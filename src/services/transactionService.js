@@ -12,7 +12,6 @@ class TransactionService{
     async createTrxn(data){
         const newTrxn = {
             ...data,
-            type: TransactionType.DEPOSIT,
             status: TransactionStatus.PENDING
         }
         return await this.#transactionRepo.create(newTrxn)
@@ -23,8 +22,12 @@ class TransactionService{
         return await this.#transactionRepo.fetchOne(query)
     }
 
-    async updateTransaction(data, transId){
-        const query = { where: { id: transId }, returning: true };
+    async setStatus(data, transId, dbOptions){
+        const query = { 
+            where: { id: transId },
+            ...dbOptions
+        };
+    
         return await this.#transactionRepo.updateOne(data, query)
     }
 }

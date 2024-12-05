@@ -29,7 +29,7 @@ const logger = createLogger({
     transports: [
         new transports.File({
             filename: "./logs/index.log",
-            level: "error",
+            level: "info",
             format: format.combine(
                 format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
                 format.printf(
