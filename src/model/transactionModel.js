@@ -18,7 +18,7 @@ const TransactionModel = DB.define(
         },
         accountId: {
             type: DataTypes.STRING,
-            allowNull: false,
+            allowNull: true,
         },
         reference: {
             type: DataTypes.STRING,
@@ -36,6 +36,18 @@ const TransactionModel = DB.define(
         status: {
             type: DataTypes.STRING,
             allowNull: false,
+        },
+        senderAccountNo:{
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        receiverAccountNo:{
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        description:{
+            type: DataTypes.STRING,    
+            allowNull:true
         },
         createdAt: {
             type: DataTypes.DATE,

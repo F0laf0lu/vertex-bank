@@ -1,7 +1,7 @@
 import sequelize from "../database/connectDB.js";
 import TransactionModel from "../model/transactionModel.js";
 import PaymentService from "../services/paymentService.js";
-import { TransactionStatus } from "../utils/enum.js";
+import { TransactionStatus, TransactionType } from "../utils/enum.js";
 import { ResponseCode } from "../utils/response.js";
 import Utility from "../utils/utils.js";
 import dotenv from "dotenv";
@@ -17,6 +17,7 @@ class TransactionController {
         this.#transactionService = _transactionService;
         this.#accountService = _accountService;
     }
+
     async deposit(req, res) {
         try {
             const { user, amount, accountNo } = req.body;
@@ -41,6 +42,7 @@ class TransactionController {
                 accountId: accountNo,
                 amount: amount,
                 reference: paystackData.data.reference,
+                type: TransactionType.DEPOSIT,
             };
             await this.#transactionService.createTrxn(newTrxn);
             return Utility.handleSuccess(
@@ -57,20 +59,20 @@ class TransactionController {
     async #completeDeposit(trans) {
         const t = await sequelize.transaction();
         try {
-            await this.#accountService.creditAccount(trans.accountId, trans.amount);
-            await this.#transactionService.updateTransaction(
+            await this.#accountService.creditAccount(trans.accountId, trans.amount, {transaction:t});
+            await this.#transactionService.setStatus(
                 { status: TransactionStatus.COMPLETED },
-                trans.id
+                trans.id,
+                {transaction:t}
             );
             await t.commit();
             return true;
         } catch (error) {
-            Utility.logger.error(error.message)
+            Utility.logger.error(error.message);
             await t.rollback();
             return false;
         }
     }
-
 
     async verifyDeposit(req, res) {
         try {
@@ -95,11 +97,11 @@ class TransactionController {
             }
 
             const isDeposited = await this.#completeDeposit(trxn);
-            
+
             if (!isDeposited) {
                 return Utility.handleError(res, "Deposit failed", ResponseCode.NOT_FOUND);
             }
-            trxn = await this.#transactionService.getTrxnByField({reference});
+            trxn = await this.#transactionService.getTrxnByField({ reference });
             return Utility.handleSuccess(res, "Deposit Successful", { trxn }, ResponseCode.SUCCESS);
         } catch (error) {
             console.log(error);
@@ -107,29 +109,60 @@ class TransactionController {
         }
     }
 
-    async internalTransfer(req, res){
-        // money transfer within accounts in the bank
+    async #completetransfer(trans) {
+        const t = await sequelize.transaction();
         try {
-            const {senderAccount, receiverAccount, amount} = req.body
-            
-            const sender = await this.#accountService.getAccountByField({accountNumber:senderAccount});
-
-            // body: sender's account, receiver's account, amount
-            // confirm accounts exist in the database
-            // check sufficient funds in sender's account
-            // deduct sender's account
-            // credit receiver's account
-            // deducting and crediting must be an atomic transaction: sequelize.transac
-            
-
-
-            return Utility.handleSuccess(res, 'Transfer Successful', {}, ResponseCode.SUCCESS)
+            await this.#accountService.debitAccount(
+                trans.senderAccountNo, trans.amount, {transaction: t});
+            await this.#accountService.creditAccount(
+                trans.receiverAccountNo, trans.amount, {transaction: t});
+            await this.#transactionService.setStatus(
+                { status: TransactionStatus.COMPLETED },
+                trans.id,
+                { transaction: t }
+            );
+            Utility.logger.info("transfer transaction successful");
+            await t.commit();
+            return true;
         } catch (error) {
-            return Utility.handleError(res, 'Server Error'. ResponseCode.SERVER_ERROR)
+            Utility.logger.error(error.message);
+            await t.rollback();
+            return false;
         }
     }
 
-    async externalTransfer(req, res){
+    async internalTransfer(req, res) {
+        try {
+            const { senderAccount, receiverAccount, amount, desc, user } = req.body;
+            const trsfTrxn = {
+                userId: user.id,
+                amount: amount,
+                reference: `txn${Utility.generateCode(12)}`,
+                type: TransactionType.TRANSFER,
+                senderAccountNo: senderAccount,
+                receiverAccountNo: receiverAccount,
+                description: desc,
+            };
+            const trxn = await this.#transactionService.createTrxn(trsfTrxn);
+            const transfer = await this.#completetransfer(trxn);
+            if (!transfer) {
+                await this.#transactionService.setStatus(
+                    {status: TransactionStatus.FAILED,},
+                    trxn.id
+                );
+                return Utility.handleError(
+                    res, "Transfer Failed", ResponseCode.BAD_REQUEST);
+            }
+
+            return Utility.handleSuccess(
+                res, "Transfer Successful", {},ResponseCode.SUCCESS);
+        } catch (error) {
+            console.log(error);
+            return Utility.handleError(res, error.message, ResponseCode.SERVER_ERROR);
+        }
+    }
+
+    async externalTransfer(req, res) {
         try {
             return Utility.handleSuccess(res, "Transfer Successful", {}, ResponseCode.SUCCESS);
         } catch (error) {
@@ -139,8 +172,6 @@ class TransactionController {
 }
 
 export default TransactionController;
-
-
 
 // To Do
 // Send Email Notification on completed transactions

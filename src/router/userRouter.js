@@ -5,12 +5,18 @@ import Validators from "../validators/userValidator.js";
 import UserRepository from "../repository/userRepository.js";
 import TokenService from "../services/tokenService.js";
 import TokenRepository from "../repository/tokenRepository.js";
+import Auth from "../middlewares/authMiddleware.js";
 
 const router = Router()
 const userRepository = new UserRepository()
 const tokenService = new TokenService(new TokenRepository())
 const userService = new UserService(userRepository)
 const userController = new UserController(userService, tokenService)
+
+
+router.get('/me', Auth, (req, res)=>{
+    return userController.getUser(req, res)
+})
 
 router.post('/register', Validators.registerValidator, (req, res)=>{
     return userController.register(req, res)

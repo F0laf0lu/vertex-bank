@@ -30,5 +30,5 @@ export const TransactionType = {
 export const TransactionStatus = {
     COMPLETED: "COMPLETED",
     PENDING: "PENDING",
-    CANCELLED: "CANCELLED"
+    FAILED: "FAILED"
 }

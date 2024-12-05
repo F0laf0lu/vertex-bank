@@ -1,3 +1,4 @@
+import { Transaction } from "sequelize";
 import TransactionModel from "../model/transactionModel.js";
 
 class TransactionRepository {
