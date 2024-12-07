@@ -164,9 +164,36 @@ class TransactionController {
 
     async externalTransfer(req, res) {
         try {
-            return Utility.handleSuccess(res, "Transfer Successful", {}, ResponseCode.SUCCESS);
+            const {senderAccount, receiverAccount, amount, bankCode, desc} = req.body
+
+            const sender = await this.#accountService.getAccountByField({ accountNumber:senderAccount });
+            if (!sender) {
+                return Utility.handleError(res, "Invalid sender account", ResponseCode.NOT_FOUND);
+            }
+
+            const response = await fetch("https://api.paystack.co/transferrecipient", {
+                method: "POST",
+                headers: {
+                    Authorization: `BEARER ${process.env.PAYSTACK_SK}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    type: "nuban",
+                    name: "Tolu Robert",
+                    account_number: receiverAccount,
+                    bank_code: "058",
+                    currency: "NGN",
+                }),
+            });
+
+            const data = await response.json()
+
+
+
+
+            return Utility.handleSuccess(res, "Transfer Successful", { data }, ResponseCode.SUCCESS);
         } catch (error) {
-            return Utility.handleError(res, "Server Error".ResponseCode.SERVER_ERROR);
+            return Utility.handleError(res, "Server Error", ResponseCode.SERVER_ERROR);
         }
     }
 }

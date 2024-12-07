@@ -27,6 +27,10 @@ router.post('/internal-transfer', Auth, trnxValidator.validateInternalTransfer, 
     return transactionController.internalTransfer(req, res)
 })
 
+router.post("/external-transfer", Auth, (req, res) => {
+    return transactionController.externalTransfer(req, res);
+});
+
 
 
 export {router as TransactionRouter}
