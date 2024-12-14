@@ -6,14 +6,20 @@ import TransactionRepository from "../repository/transactionRepository.js";
 import AccountService from "../services/accountService.js";
 import AccountRepository from "../repository/accountRepository.js";
 import trnxValidator from "../validators/transactionValidator.js";
+import ReceipientRepository from "../repository/receipientRepository.js";
+import ReceipientService from "../services/recepientService.js";
 
 const router = Router();
 
 const accountRepo = new AccountRepository()
 const accountService = new AccountService(accountRepo);
+const receipientRepo = new ReceipientRepository();
+const receipientService = new ReceipientService(receipientRepo);
 const trxRepo = new TransactionRepository()
 const trxService = new TransactionService(trxRepo)
-const transactionController = new TransactionController(trxService, accountService)
+const transactionController = new TransactionController(trxService, accountService, receipientService)
+
+
 
 router.post('/deposit', Auth, (req, res)=>{
     return transactionController.deposit(req, res);

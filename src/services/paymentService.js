@@ -13,16 +13,13 @@ class PaymentService {
                 Authorization: `BEARER ${process.env.PAYSTACK_SK}`,
                 "Content-Type": "application/json",
             };
-            const response = await fetch(
-                "https://api.paystack.co/transaction/initialize",
-                {
-                    method: "POST",
-                    headers: headers,
-                    body: JSON.stringify({ ...payment_data }),
-                }
-            );
+            const response = await fetch("https://api.paystack.co/transaction/initialize", {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify({ ...payment_data }),
+            });
             const paystackData = await response.json();
-            return paystackData
+            return paystackData;
         } catch (error) {
             Utility.logger.error(error.message);
             return null;
@@ -51,6 +48,62 @@ class PaymentService {
         } catch (error) {
             Utility.logger.error(error.message);
             return false;
+        }
+    }
+
+    async createPaystackReceipient(acctNo, bankCode) {
+        try {
+            const response = await fetch("https://api.paystack.co/transferrecipient", {
+                method: "POST",
+                headers: {
+                    Authorization: `BEARER ${process.env.PAYSTACK_SK}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    type: "nuban",
+                    // name: "Folafolu Osilaja",
+                    account_number: acctNo,
+                    bank_code: bankCode,
+                    currency: "NGN",
+                }),
+            });
+
+            if (!response.ok) {
+                return {status: "failed", message:response.statusText}
+            }
+            const { data } = await response.json();
+            if (!data) {
+                return {status:false, message:"Request failed"}
+            }
+            return data
+        } catch (error) {
+            Utility.logger.error(error.message)
+            return {status:false, message:'Operation failed'};
+        }
+    }
+
+    async initiatePaystackTranfer(amount, reason='', receipientCode, reference){
+        try {
+            const transferData = {
+                source: "balance",
+                amount: amount * 100,
+                reason,
+                recipient: receipientCode,
+                reference
+            }
+            const response = await fetch("https://api.paystack.co/transfer", {
+                method: "POST",
+                headers: {
+                    Authorization: `BEARER ${process.env.PAYSTACK_SK}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({...transferData})
+            });
+            const paystackData = await response.json();
+            return paystackData;
+        } catch (error) {
+            Utility.logger.error(error.message);
+            return {status:false, message:"Server Error"}
         }
     }
 }

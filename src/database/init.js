@@ -3,6 +3,7 @@ import UserModel from "../model/userModel.js";
 import TokenModel from "../model/tokenModel.js";
 import AccountModel from "../model/accountModel.js";
 import TransactionModel from "../model/transactionModel.js";
+import ReceipientModel from "../model/recipientModel.js";
 
 
 const DbInitialize = async()=>{
@@ -12,6 +13,7 @@ const DbInitialize = async()=>{
         await TokenModel.sync({ alter: true });
         await AccountModel.sync({ alter: true });
         await TransactionModel.sync({ alter: true });
+        await ReceipientModel.sync({alter: true})
     } catch (error) {
         console.error(error)
         console.log("Unable to connect to database")
