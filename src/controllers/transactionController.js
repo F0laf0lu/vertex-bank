@@ -1,5 +1,4 @@
 import sequelize from "../database/connectDB.js";
-import TransactionModel from "../model/transactionModel.js";
 import PaymentService from "../services/paymentService.js";
 import { TransactionStatus, TransactionType } from "../utils/enum.js";
 import { ResponseCode } from "../utils/response.js";
