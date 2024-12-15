@@ -165,6 +165,39 @@ class TransactionController {
         }
     }
 
+    async #fetchOrCreateRecipient(receiverAccount, bankCode, userId) {
+        const recipient = await this.#receipientService.getReceipient({
+            bankCode,
+            accountNumber: receiverAccount,
+        });
+
+        if (recipient) {
+            return {
+                code: recipient.receipientCode,
+                name: recipient.accountName,
+            };
+        }
+
+        const newRecipient = await paymentService.createPaystackReceipient(
+            receiverAccount,
+            bankCode
+        );
+        const recipientData = {
+            createdBy: userId,
+            accountName: newRecipient.details.account_name,
+            accountNumber: receiverAccount,
+            receipientCode: newRecipient.recipient_code,
+            bankCode,
+        };
+
+        await this.#receipientService.createReceipient(recipientData);
+
+        return {
+            code: newRecipient.recipient_code,
+            name: newRecipient.details.account_name,
+        };
+    }
+
     async #completeExternalTransfer(trans) {
         const t = await sequelize.transaction();
 
@@ -188,35 +221,8 @@ class TransactionController {
     async externalTransfer(req, res) {
         try {
             const { senderAccount, receiverAccount, amount, bankCode, reason, user } = req.body;
-            const receipient = await this.#receipientService.getReceipient({
-                bankCode,
-                accountNumber: receiverAccount,
-            });
-
-            let receipientCode;
-            let receipientName;
-            if (!receipient) {
-                const newReceipient = await paymentService.createPaystackReceipient(
-                    receiverAccount,
-                    bankCode
-                );
-                receipientCode = newReceipient.recipient_code;
-                receipientName = newReceipient.details.account_name;
-                let receipientData = {
-                    createdBy: req.body.user.id,
-                    accountName: newReceipient.details.account_name,
-                    accountNumber: receiverAccount,
-                    receipientCode: newReceipient.recipient_code,
-                    bankCode,
-                };
-                await this.#receipientService.createReceipient(receipientData);
-            } else {
-                receipientCode = receipient.receipientCode;
-                receipientName = receipient.accountName;
-            }
-
+            const receipient = await this.#fetchOrCreateRecipient(receiverAccount, bankCode, user.id)
             const ref = `trsf-txn${Utility.generateCode(16)}`;
-
             const trsfData = {
                 userId: user.id,
                 amount: amount,
@@ -224,14 +230,13 @@ class TransactionController {
                 type: TransactionType.TRANSFER,
                 senderAccountNo: senderAccount,
                 receiverAccountNo: receiverAccount,
-                description: reason ? reason : `transfer/${receipientName}`,
+                description: reason ? reason : `transfer/${receipient.name}`,
             };
-
             let trsfTrxn = await this.#transactionService.createTrxn(trsfData);
             const transferData = await paymentService.initiatePaystackTranfer(
                 amount,
                 reason,
-                receipientCode,
+                receipient.code,
                 ref
             );
             if (!transferData.status) {
@@ -245,7 +250,6 @@ class TransactionController {
                     ResponseCode.BAD_REQUEST
                 );
             }
-
             const result = await this.#completeExternalTransfer(trsfTrxn);
             if (!result.status) {
                 return Utility.handleError(res, "Transfer failed", ResponseCode.BAD_REQUEST);
