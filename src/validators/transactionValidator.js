@@ -3,39 +3,36 @@ import Utility from "../utils/utils.js";
 import { ResponseCode } from "../utils/response.js";
 import AccountService from "../services/accountService.js";
 import AccountRepository from "../repository/accountRepository.js";
-
+import { BankCodes } from "../utils/enum.js";
 
 const accountRepo = new AccountRepository();
 const accountService = new AccountService(accountRepo);
-
 
 const validateSenderAccount = async (req, res, next) => {
     const { senderAccount, user } = req.body;
 
     try {
-            const sender = await accountService.getAccountByField({
-                accountNumber: senderAccount,
-            });
+        const sender = await accountService.getAccountByField({
+            accountNumber: senderAccount,
+        });
 
-            if (!sender) {
-                return Utility.handleError(res, "Sender account not found", ResponseCode.NOT_FOUND);
-            }
+        if (!sender) {
+            return Utility.handleError(res, "Sender account not found", ResponseCode.NOT_FOUND);
+        }
 
-            if (sender.userId != user.id) {
-                return Utility.handleError(
-                    res,
-                    "Permission Denied. Can only transfer from your account",
-                    ResponseCode.PERMISSION_DENIED
-                );
-            }
-            req.sender = sender
+        if (sender.userId != user.id) {
+            return Utility.handleError(
+                res,
+                "Permission Denied. Can only transfer from your account",
+                ResponseCode.PERMISSION_DENIED
+            );
+        }
+        req.sender = sender;
         next();
     } catch (error) {
         return Utility.handleError(res, error.message, ResponseCode.SERVER_ERROR);
     }
 };
-
-
 
 const validateReceiverAccount = async (req, res, next) => {
     const { receiverAccount } = req.body;
@@ -76,8 +73,6 @@ const validateTransferDetails = (req, res, next) => {
     }
 };
 
-
-
 const validateInternalTransfer = [
     body("senderAccount")
         .trim()
@@ -97,14 +92,14 @@ const validateInternalTransfer = [
         .withMessage("Amount is required")
         .isFloat({ gt: 0 })
         .withMessage("Amount must be greater than zero"),
-    body("desc").trim().optional().isString().withMessage("Description must be a        string"),
+    body("desc").trim().optional().isString().withMessage("Description must be a string"),
 
     // Middleware to handle validation errors
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             const error = errors.array().map((error) => {
-                    error.msg;
+                error.msg;
             });
 
             return Utility.handleError(res, error, ResponseCode.BAD_REQUEST);
@@ -117,9 +112,51 @@ const validateInternalTransfer = [
     validateTransferDetails,
 ];
 
+const validateExternalTransfer = [
+    body("senderAccount")
+        .trim()
+        .notEmpty()
+        .withMessage("Sender account is required")
+        .isString()
+        .withMessage("Sender account must be a string"),
+    body("receiverAccount")
+        .trim()
+        .notEmpty()
+        .withMessage("Receiver account is required")
+        .isString()
+        .withMessage("Receiver account must be a string"),
+    body("amount")
+        .trim()
+        .notEmpty()
+        .withMessage("Amount is required")
+        .isFloat({ gt: 0 })
+        .withMessage("Amount must be greater than zero"),
+    body("bankCode")
+        .trim()
+        .notEmpty()
+        .withMessage("Bank Code is required")
+        .isIn(BankCodes)
+        .withMessage("Bank not supported"),
+
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            const error = errors.array().map((error) => {
+                return error.msg;
+            });
+
+            return Utility.handleError(res, {error}, ResponseCode.BAD_REQUEST);
+        }
+        next();
+    },
+
+    validateSenderAccount,
+    validateTransferDetails
+];
+
 const trnxValidator = {
     validateInternalTransfer,
-}
+    validateExternalTransfer
+};
 
-
-export default trnxValidator
+export default trnxValidator;

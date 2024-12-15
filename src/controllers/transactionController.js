@@ -178,7 +178,7 @@ class TransactionController {
                 { transaction: t }
             );
             await t.commit();
-            return  {status: true, transaction: transfer };
+            return { status: true, transaction: transfer };
         } catch (error) {
             await t.rollback();
             return { status: false, transaction: null };
@@ -188,12 +188,6 @@ class TransactionController {
     async externalTransfer(req, res) {
         try {
             const { senderAccount, receiverAccount, amount, bankCode, reason, user } = req.body;
-            const sender = await this.#accountService.getAccountByField({
-                accountNumber: senderAccount,
-            });
-            if (!sender) {
-                return Utility.handleError(res, "Invalid sender account", ResponseCode.NOT_FOUND);
-            }
             const receipient = await this.#receipientService.getReceipient({
                 bankCode,
                 accountNumber: receiverAccount,
