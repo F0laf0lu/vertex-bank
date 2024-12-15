@@ -165,13 +165,29 @@ class TransactionController {
         }
     }
 
-    async #completeExternalTransfer(){
-        
+    async #completeExternalTransfer(trans) {
+        const t = await sequelize.transaction();
+
+        try {
+            await this.#accountService.debitAccount(trans.senderAccountNo, trans.amount, {
+                transaction: t,
+            });
+            let transfer = await this.#transactionService.setStatus(
+                { status: TransactionStatus.COMPLETED },
+                trans.id,
+                { transaction: t }
+            );
+            await t.commit();
+            return  {status: true, transaction: transfer };
+        } catch (error) {
+            await t.rollback();
+            return { status: false, transaction: null };
+        }
     }
 
     async externalTransfer(req, res) {
         try {
-            const { senderAccount, receiverAccount, amount, bankCode, reason } = req.body;
+            const { senderAccount, receiverAccount, amount, bankCode, reason, user } = req.body;
             const sender = await this.#accountService.getAccountByField({
                 accountNumber: senderAccount,
             });
@@ -182,13 +198,16 @@ class TransactionController {
                 bankCode,
                 accountNumber: receiverAccount,
             });
+
             let receipientCode;
+            let receipientName;
             if (!receipient) {
                 const newReceipient = await paymentService.createPaystackReceipient(
                     receiverAccount,
                     bankCode
                 );
                 receipientCode = newReceipient.recipient_code;
+                receipientName = newReceipient.details.account_name;
                 let receipientData = {
                     createdBy: req.body.user.id,
                     accountName: newReceipient.details.account_name,
@@ -199,36 +218,48 @@ class TransactionController {
                 await this.#receipientService.createReceipient(receipientData);
             } else {
                 receipientCode = receipient.receipientCode;
+                receipientName = receipient.accountName;
             }
-            const ref = `txn-trsf${Utility.generateCode(16)}`;
+
+            const ref = `trsf-txn${Utility.generateCode(16)}`;
+
+            const trsfData = {
+                userId: user.id,
+                amount: amount,
+                reference: ref,
+                type: TransactionType.TRANSFER,
+                senderAccountNo: senderAccount,
+                receiverAccountNo: receiverAccount,
+                description: reason ? reason : `transfer/${receipientName}`,
+            };
+
+            let trsfTrxn = await this.#transactionService.createTrxn(trsfData);
             const transferData = await paymentService.initiatePaystackTranfer(
                 amount,
                 reason,
                 receipientCode,
                 ref
             );
-            // cannot initiate third party payouts as a starter business from paystack
-            // transfer can't be complete or verified since it's side project
-            // I'll assume the transfer was successful
-
-            const result = await this.completeExternalAccount(
-                senderAccount,
-                receiverAccount,
-                ref,
-                amount
-            );
-            if (!result.status) {
+            if (!transferData.status) {
+                await this.#transactionService.setStatus(
+                    { status: TransactionStatus.FAILED },
+                    trsfTrxn.id
+                );
                 return Utility.handleError(
                     res,
-                    "Withdrawal transaction failed",
+                    "Transfer failed. Try again later",
                     ResponseCode.BAD_REQUEST
                 );
             }
 
+            const result = await this.#completeExternalTransfer(trsfTrxn);
+            if (!result.status) {
+                return Utility.handleError(res, "Transfer failed", ResponseCode.BAD_REQUEST);
+            }
             return Utility.handleSuccess(
                 res,
                 "Transfer Successful",
-                { receipientCode },
+                { transaction: result.transaction },
                 ResponseCode.SUCCESS
             );
         } catch (error) {

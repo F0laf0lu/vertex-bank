@@ -89,17 +89,30 @@ class PaymentService {
                 amount: amount * 100,
                 reason,
                 recipient: receipientCode,
-                reference
-            }
+                reference,
+            };
             const response = await fetch("https://api.paystack.co/transfer", {
                 method: "POST",
                 headers: {
                     Authorization: `BEARER ${process.env.PAYSTACK_SK}`,
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({...transferData})
+                body: JSON.stringify({ ...transferData }),
             });
-            const paystackData = await response.json();
+            // cannot initiate third party payouts as a starter business: from paystack
+            // transfer can't be complete or verified since it's side project
+            // I'll assume the transfer was successful
+            // data will always be false
+            const data = await response.json();
+
+            // custom code to simulate failed or successful transaction
+            let paystackData = { status: false };
+            let status = [false, true];
+            let num = Math.floor(Math.random() * 2);
+            console.log(status[num])
+            if (status[num]) {
+                paystackData.status = true;
+            }
             return paystackData;
         } catch (error) {
             Utility.logger.error(error.message);
