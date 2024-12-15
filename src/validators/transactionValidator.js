@@ -145,7 +145,7 @@ const validateExternalTransfer = [
                 return error.msg;
             });
 
-            return Utility.handleError(res, {error}, ResponseCode.BAD_REQUEST);
+            return Utility.handleError(res, {...error}, ResponseCode.BAD_REQUEST);
         }
         next();
     },
