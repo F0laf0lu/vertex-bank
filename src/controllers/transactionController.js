@@ -257,7 +257,7 @@ class TransactionController {
             return Utility.handleSuccess(
                 res,
                 "Transfer Successful",
-                { transaction: result.transaction },
+                result.transaction,
                 ResponseCode.SUCCESS
             );
         } catch (error) {

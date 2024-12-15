@@ -23,12 +23,13 @@ class TransactionService{
     }
 
     async setStatus(data, transId, dbOptions){
-        const query = { 
+        const query = {
             where: { id: transId },
-            ...dbOptions
+            returning: true,
+            ...dbOptions,
         };
-    
-        return await this.#transactionRepo.updateOne(data, query)
+        const [rowsUpdated, [updatedTransaction]] = await this.#transactionRepo.updateOne(data, query)
+        return updatedTransaction;
     }
 }
 
